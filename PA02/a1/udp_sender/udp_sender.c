@@ -30,6 +30,7 @@ int main(int argc, char** argv)
     printf("%s", filename);
     unsigned int filesize;
     char* header = malloc(sizeof(HEADER_T) + sizeof(namelength) + sizeof(filename) + sizeof(filesize));
+    // Daten in header speichern
     strcat(header, (unsigned char*) &HEADER_T);
     strcat(header, (unsigned char*) &namelength);
     strcat(header, (unsigned char*) &filename);

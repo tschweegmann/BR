@@ -2,7 +2,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <openssl/sha.h>
 #include <unistd.h>
+#include <sys/time.h>
 #include "Aufgabe2.h"
 
 int main(int argc, char** argv)
@@ -15,6 +17,7 @@ int main(int argc, char** argv)
     FILE* file;
     unsigned char* buff[1024];
     int tolen;
+    struct timeval tv;
     tolen = sizeof(to);
     port = atoi(argv[1]);
     addr = argv[2];
@@ -22,6 +25,9 @@ int main(int argc, char** argv)
 
     //socket()
     fd = socket(AF_INET, SOCK_DGRAM, 0);
+    tv.tv_sec = 10;
+    tv.tv_usec = 0;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     // Sender Adresse
     from.sin_family = AF_INET;
     from.sin_port = htons(port);
@@ -36,7 +42,8 @@ int main(int argc, char** argv)
     //REQUEST_T schicken
     sendto(fd, &REQUEST_T, sizeof(REQUEST_T), 0, (struct sockaddr*) &to, tolen);
     //Auf HEADER_T Antwort warten
-
+    recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
+    
     //Datagramme DATA_T empfangen
 
     //SHA-512 empfangen SHA512_T
