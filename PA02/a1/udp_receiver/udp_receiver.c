@@ -8,15 +8,16 @@
 int main(int argc, char** argv)
 {
     int port;
-    char* path;
+    const char* addr;
     int fd;
     struct sockaddr_in from;
     struct sockaddr_in to;
     FILE* file;
     unsigned char* buff[1024];
-
+    int tolen;
+    tolen = sizeof(to);
     port = atoi(argv[1]);
-    path = argv[2];
+    addr = argv[2];
 
 
     //socket()
@@ -28,12 +29,12 @@ int main(int argc, char** argv)
     // Empfänger Adresse
     to.sin_family = AF_INET;
     to.sin_port = htons(port);
-    //to.sin_addr.s_addr = 
+    to.sin_addr.s_addr = inet_addr(addr); 
     
     //Bind()
     bind(fd, (struct sockaddr*) &from, sizeof(from));
     //REQUEST_T schicken
-
+    sendto(fd, &REQUEST_T, sizeof(REQUEST_T), 0, (struct sockaddr*) &to, tolen);
     //Auf HEADER_T Antwort warten
 
     //Datagramme DATA_T empfangen
