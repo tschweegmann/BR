@@ -9,25 +9,27 @@
 
 int main(int argc, char** argv)
 {
+    int i = 0;
     int port;
     const char* addr;
-    int fd;
+    int fd, err;
     struct sockaddr_in from;
     struct sockaddr_in to;
     FILE* file;
-    unsigned char* buff[1024];
+    unsigned char buff[1024];
+    unsigned char shabuff[64];
+    unsigned char request = 5;
     int tolen;
     struct timeval tv;
     tolen = sizeof(to);
     port = atoi(argv[1]);
     addr = argv[2];
-
+    printf("Connecting to %s\n", addr);
 
     //socket()
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     tv.tv_sec = 10;
     tv.tv_usec = 0;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     // Sender Adresse
     from.sin_family = AF_INET;
     from.sin_port = htons(port);
@@ -36,18 +38,43 @@ int main(int argc, char** argv)
     to.sin_family = AF_INET;
     to.sin_port = htons(port);
     to.sin_addr.s_addr = inet_addr(addr); 
-    
+
     //Bind()
     bind(fd, (struct sockaddr*) &from, sizeof(from));
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     //REQUEST_T schicken
-    sendto(fd, &REQUEST_T, sizeof(REQUEST_T), 0, (struct sockaddr*) &to, tolen);
+    err = sendto(fd, &request, sizeof(request), 0, (struct sockaddr*) &to, tolen);
+    if(err == -1)
+    {
+        printf("ERROR: couldnt send\n");
+    }
+    else 
+    {
+        printf("Data sent %d Bytes\n", err);
+    }
     //Auf HEADER_T Antwort warten
-    recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
-    
+    printf("waiting for response...\n");
+    err = recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
+
+    if (err == -1)
+    {
+        printf("Nothing received :(\n");
+    }
+    else
+    {
+        printf("Received %d Bytes\n", err);
+    }
+    printf("Header: %d", (int)buff[0]);
+    printf("namelength: %d", (short)buff[1]);
     //Datagramme DATA_T empfangen
+    printf("receiving Datagram...\n");
+    while(buff[0] != (unsigned char)SHA512_T)
+    {
+        recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
+    }
 
     //SHA-512 empfangen SHA512_T
-
+    recvfrom(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, &tolen);
     // Vergleichsergebnis übertragen SHA512_CMP_T
 
     // close socket
