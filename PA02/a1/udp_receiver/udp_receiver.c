@@ -67,15 +67,17 @@ int main(int argc, char** argv)
     /* receiving header */
     printf("waiting for response...\n");
     err = recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
-
     if (err == -1)
     {
         printf("Nothing received :(\n");
+        printf("%s", timeout_error);
+        exit(-1);
     }
     else
     {
         printf("Received %d Bytes\n", err);
     }
+    if (*buff != HEADER_T) printf("%s", packet_error);
 
     /* receiving data */
     printf("receiving Datagram...\n");
@@ -90,6 +92,7 @@ int main(int argc, char** argv)
         if (err == -1) 
         {
             printf("ERROR: couldnt receive\n");
+            printf("%s", timeout_error);
             exit(-1);
         }
         printf("DATA_T: %d \n", *buff);
@@ -104,7 +107,7 @@ int main(int argc, char** argv)
     {
         printf("received SHA512 typID\n");
     }
-
+    else printf("%s", packet_error);
     /* sending SHA512_CMP_T */
     typID = SHA512_CMP_T;
 

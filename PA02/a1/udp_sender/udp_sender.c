@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     int err;
     struct sockaddr_in from;
     struct sockaddr_in to;
-    unsigned char typID; /* buffer for REQUEST_T HEADER_T etc (probably irrelevant)*/
+    unsigned char typID;
     int tolen;
     struct timeval tv; /* to make recvfrom() wait */
     FILE* file;
@@ -48,10 +48,13 @@ int main(int argc, char** argv)
     int c;
     int i;
     int eof = 0;
+
+    /* DATA_T package stuff*/
     unsigned int seqNr;
     unsigned int* seqNrptr = 0;
     unsigned char* data = 0;
 
+    /* Input (still needs to check if input is correct)*/
     path = argv[2];
     port = atoi(argv[1]);
 
@@ -60,8 +63,7 @@ int main(int argc, char** argv)
     from.sin_port = htons(port);
     from.sin_addr.s_addr = htonl(INADDR_ANY);
 
-
-    // Zip file
+    /* Zip file */
     printf("File path: %s\n", path);
     strcat(command, zipstring);
     strcat(command, path);
@@ -69,27 +71,34 @@ int main(int argc, char** argv)
     system(command);
     file = fopen("dir.zip", "rw");
 
-    // init Header
-    printf("Header:\n");
+    /* Header */
+    /* get data needed for header */
     filename = basename(path);
-    printf("filename: %s\n", filename);
     namelength = strlen(filename);
-    printf("namelength %d\n", namelength);
     fseek(file, 0L, SEEK_END);
     filesize = ftell(file);
     rewind(file);
+    /* (DEBUG) prints data to be included in header*/
+    printf("Header:\n");
+    printf("filename: %s\n", filename);
+    printf("namelength %d\n", namelength);
     printf("Filesize: %d\n", filesize);
 
-    // creaete Header
+    /* add to header */
+    /* Typ-id */
     typID = HEADER_T;
     memcpy(header, &typID, sizeof(typID));
+    /* namelength */
     namelengthptr = header + sizeof(typID);
     memcpy(namelengthptr, &namelength, sizeof(namelength));
+    /* filename */
     filenameptr = header + sizeof(typID) + sizeof(unsigned short);
     memcpy(filenameptr, &filename, sizeof(filename));
+    /* filesize */
     filesizeptr = header + sizeof(typID) + sizeof(namelength) + sizeof(filename);
     memcpy(filesizeptr, &filesize, sizeof(filesize));
 
+    /* (DEBUG) print actual header data */
     printf("HEADER_T in header: %d \n", *header);
     printf("namelength in header: %d \n", *namelengthptr);
     memcpy(&filename, filenameptr, sizeof(filename));
@@ -103,27 +112,33 @@ int main(int argc, char** argv)
     //SHA512_Final();
     //SHA512(const unsigned char* text, size_t buffer size, shabuffer); //returns pointer to hash
 
-    // Socket
+    /* Socket */
     fd = socket(AF_INET, SOCK_DGRAM, 0);
-    //setTimeout to 10 sec
+    /* set socket timeout (10 sec) */
     tv.tv_sec = 10;
     tv.tv_usec = 0;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     tolen = sizeof(struct sockaddr_in);
     bind(fd, (struct sockaddr*) &from, sizeof(from));
 
     /* Data exchange */
-    /* initial REQUEST_T */
+    /* recv initial request */
     printf("waiting for request...\n");
     err = recvfrom(fd, &typID, sizeof(typID), 0, (struct sockaddr*)&to, &tolen);
     if (err == -1)
     {
-        printf("ERROR: nothing received\n");
+        printf("%s", timeout_error);
         exit(-1);
     }
     else
     {
         printf("Received %d Bytes\n", err);
+    }
+    if (*buff != REQUEST_T)
+    {
+        printf("%s", packet_error);
+        exit(-1);
     }
 
     /* send header */
@@ -133,7 +148,7 @@ int main(int argc, char** argv)
     /* send data */
     typID = DATA_T;
     seqNr = 0;
-    data = buff + sizeof(typID) + sizeof(seqNr);
+    data = buff + sizeof(typID) + sizeof(seqNr); /* Pointer to real data */ 
     while(eof == 0)
     {
         memset(buff, 0, sizeof(buff));
@@ -149,8 +164,8 @@ int main(int argc, char** argv)
             }
             memcpy(data + i, &c, sizeof(c));
         }
-        printf("sent DGRAM!\n");
         sendto(fd, buff, sizeof(buff), 0, (struct sockaddr*)&to, tolen);
+        printf("sent DGRAM!\n");
     }
     fclose(file);
     printf("all DGRAMS sent\n");
@@ -174,15 +189,26 @@ int main(int argc, char** argv)
     err = recvfrom(fd, &cmpResult, sizeof(cmpResult), 0, (struct sockaddr*) &to, &tolen);
     if (err = -1)
     {
-        printf("ERROR: No SHA_CMP_T received\n");
+        printf("%s", timeout_error);
         exit(-1);
     }
     else
     {
         printf("received SHA_CMP_T\n");
     }
+
     if (cmpResult == SHA512_CMP_OK) printf("SHA_CMP is correct!");
-    else printf("SHA_CMP does not match!");
+    else if (cmpResult == SHA512_CMP_ERROR) 
+    {
+        printf("SHA_CMP does not match!");
+        exit(-1);
+    }
+    else 
+    {
+        printf("%s", packet_error);
+        exit(-1);
+    }
+    printf("transmission completed\n");
     /* close socket */
     close(fd);
 }
