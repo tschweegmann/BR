@@ -24,6 +24,7 @@ int main(int argc, char** argv)
     int tolen;
     struct timeval tv; /* to make recvfrom() wait */
     FILE* file;
+    unsigned char* buff[1024];
 
     /* Zip creation stuff */
     char* zipstring = "zip -r dir.zip ";
@@ -36,8 +37,13 @@ int main(int argc, char** argv)
     char* header = malloc(sizeof(HEADER_T) + sizeof(namelength) + sizeof(filename) + sizeof(filesize));
 
     /* SHA512 stuff*/
+    unsigned char* shabuff[65];
     unsigned char* mySha512[64];
     unsigned char* recvSha512[64];
+
+    int c;
+    int i;
+    int eof = 0;
 
     path = argv[2];
     port = atoi(argv[1]);
@@ -73,6 +79,8 @@ int main(int argc, char** argv)
     //calc SHA-512
     SHA512_CTX ctx;
     SHA512_Init(&ctx);
+    //SHA512_Update(&ctx, file, filesize);
+    //SHA512_Final();
     //SHA512(const unsigned char* text, size_t buffer size, shabuffer); //returns pointer to hash
 
     // Socket
@@ -102,14 +110,37 @@ int main(int argc, char** argv)
     sendto(fd, header, sizeof(header), 0, (struct sockaddr*)&to, tolen);
 
     // DATA_T senden (DATA_T, unsigned integer SeqNmbr(0-n), Daten)
-    //while(/*Not all Data sent*/)
-    //{
-    //    sendto(fd, /*Datagram*/, /*sizeof(Datagram)*/, 0, (struct sockaddr*)&to, tolen);
-    //}
+    while(eof == 0)
+    {
+        for (i = 0; i < 1024; i++)
+        {
+            c = fgetc(file);
+            if (c == EOF) 
+            {
+                eof = 1;
+                break;
+            }
+            buff[i] = (unsigned char)c;
+            printf("%c", buff[i]);
+        }
+        printf("sent DGRAM!\n");
+        sendto(fd, buff, sizeof(buff), 0, (struct sockaddr*)&to, tolen);
+    }
+    printf("all DGRAMS sent\n");
 
     // SHA512_T senden (SHA512_T, SHA-512-Hashwert(64Bytes))
-    //sendto(fd, shabuffer, sizeof(shabuffer), 0, (struct sockaddr*) &to, tolen);
-
+    printf("Sending SHA512...\n");
+    strcat(shabuff, (unsigned char*) &SHA512_T);
+    strcat(shabuff, &mySha512);
+    err = sendto(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, tolen);
+    if (err == -1)
+    {
+        printf("ERROR: couldnt send SHA!\n");
+    }
+    else
+    {
+        printf("Send SHA512 size: %d Bytes", err);
+    }
     // SHA512_CMP_T empfangen (SHA512_CMP_T, Vergleichsergebniss(1Bytes))
     //recvfrom(fd, recvSha512, sizeof(recvSha512), 0, (struct sockaddr*) &to, &tolen);
 

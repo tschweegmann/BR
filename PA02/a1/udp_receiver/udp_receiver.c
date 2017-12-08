@@ -17,7 +17,7 @@ int main(int argc, char** argv)
     int err;
     struct sockaddr_in from;
     struct sockaddr_in to;
-    FILE* file;
+    FILE* file = fopen("dir.zip", "a");
     unsigned char buff[1024];
     unsigned char shabuff[64];
     unsigned char request = 5;
@@ -58,7 +58,7 @@ int main(int argc, char** argv)
     {
         printf("ERROR: couldnt send\n");
     }
-    else 
+    else
     {
         printf("Data sent %d Bytes\n", err);
     }
@@ -81,11 +81,20 @@ int main(int argc, char** argv)
     while(buff[0] != (unsigned char)SHA512_T)
     {
         recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
+        for (i = 0; i < 1024; i++) fputc(buff[i], file); 
     }
 
     /* receiving SHA */
-    recvfrom(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, &tolen);
-
+    printf("receifing SHA512...\n");
+    err = recvfrom(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, &tolen);
+    if (err == -1)
+    {
+        printf("ERROR: nothing received\n");
+    }
+    else
+    {
+        printf("received %d Bytes\n", err);
+    }
     /* sending SHA512_CMP_T */
 
     /* close socket */
