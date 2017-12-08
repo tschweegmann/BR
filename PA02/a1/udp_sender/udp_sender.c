@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     int err;
     struct sockaddr_in from;
     struct sockaddr_in to;
-    void* request[8]; /* buffer for REQUEST_T (probably irrelevant)*/
+    unsigned char typID; /* buffer for REQUEST_T HEADER_T etc (probably irrelevant)*/
     int tolen;
     struct timeval tv; /* to make recvfrom() wait */
     FILE* file;
@@ -28,22 +28,29 @@ int main(int argc, char** argv)
 
     /* Zip creation stuff */
     char* zipstring = "zip -r dir.zip ";
-    char* command = malloc(sizeof(zipstring) + sizeof(path));
-
+    char* command[sizeof(zipstring) + sizeof(path)];
     /* Header stuff*/
     char* filename;
     unsigned short namelength;
     unsigned int filesize;
-    char* header = malloc(sizeof(HEADER_T) + sizeof(namelength) + sizeof(filename) + sizeof(filesize));
+    /* Header still takes to much mem: 120Bytes instead of 15 :/*/
+    unsigned char* header[sizeof(typID) + sizeof(namelength) + sizeof(filename) + sizeof(filesize)];
+    /* ptr to things in header*/
+    char* filenameptr = 0;
+    unsigned short* namelengthptr = 0;
+    unsigned int* filesizeptr = 0;
 
     /* SHA512 stuff*/
     unsigned char* shabuff[65];
     unsigned char* mySha512[64];
-    unsigned char* recvSha512[64];
+    unsigned char cmpResult;
 
     int c;
     int i;
     int eof = 0;
+    unsigned int seqNr;
+    unsigned int* seqNrptr = 0;
+    unsigned char* data = 0;
 
     path = argv[2];
     port = atoi(argv[1]);
@@ -62,19 +69,32 @@ int main(int argc, char** argv)
     system(command);
     file = fopen("dir.zip", "rw");
 
-    // init Header 
+    // init Header
+    printf("Header:\n");
     filename = basename(path);
+    printf("filename: %s\n", filename);
     namelength = strlen(filename);
+    printf("namelength %d\n", namelength);
     fseek(file, 0L, SEEK_END);
     filesize = ftell(file);
     rewind(file);
-    printf("Filesize: %d", filesize);
+    printf("Filesize: %d\n", filesize);
 
-    // creaete Header 
-    strcat(header, (unsigned char*) &HEADER_T);
-    strcat(header, (unsigned char*) &namelength);
-    strcat(header, (unsigned char*) &filename);
-    strcat(header, (unsigned char*) &filesize);
+    // creaete Header
+    typID = HEADER_T;
+    memcpy(header, &typID, sizeof(typID));
+    namelengthptr = header + sizeof(typID);
+    memcpy(namelengthptr, &namelength, sizeof(namelength));
+    filenameptr = header + sizeof(typID) + sizeof(unsigned short);
+    memcpy(filenameptr, &filename, sizeof(filename));
+    filesizeptr = header + sizeof(typID) + sizeof(namelength) + sizeof(filename);
+    memcpy(filesizeptr, &filesize, sizeof(filesize));
+
+    printf("HEADER_T in header: %d \n", *header);
+    printf("namelength in header: %d \n", *namelengthptr);
+    memcpy(&filename, filenameptr, sizeof(filename));
+    printf("filenameptr in header : %s\n", filename);
+    printf("filesize in header: %d \n", *filesizeptr);
 
     //calc SHA-512
     SHA512_CTX ctx;
@@ -92,27 +112,34 @@ int main(int argc, char** argv)
     tolen = sizeof(struct sockaddr_in);
     bind(fd, (struct sockaddr*) &from, sizeof(from));
 
-    // Data exchange
-    // initial REQUEST_T
+    /* Data exchange */
+    /* initial REQUEST_T */
     printf("waiting for request...\n");
-    err = recvfrom(fd, request, sizeof(request), 0, (struct sockaddr*)&to, &tolen);
+    err = recvfrom(fd, &typID, sizeof(typID), 0, (struct sockaddr*)&to, &tolen);
     if (err == -1)
     {
         printf("ERROR: nothing received\n");
+        exit(-1);
     }
-    else 
+    else
     {
         printf("Received %d Bytes\n", err);
     }
 
-    // send HEADER_T
+    /* send header */
     printf("sending header...\n");
     sendto(fd, header, sizeof(header), 0, (struct sockaddr*)&to, tolen);
 
-    // DATA_T senden (DATA_T, unsigned integer SeqNmbr(0-n), Daten)
+    /* send data */
+    typID = DATA_T;
+    seqNr = 0;
+    data = buff + sizeof(typID) + sizeof(seqNr);
     while(eof == 0)
     {
-        for (i = 0; i < 1024; i++)
+        memset(buff, 0, sizeof(buff));
+        memcpy(buff, &typID, sizeof(typID));
+        memcpy(buff + sizeof(typID), &seqNr, sizeof(seqNr)); 
+        for (i = 0; i < 1019; i++)
         {
             c = fgetc(file);
             if (c == EOF) 
@@ -120,15 +147,16 @@ int main(int argc, char** argv)
                 eof = 1;
                 break;
             }
-            buff[i] = (unsigned char)c;
-            printf("%c", buff[i]);
+            memcpy(data + i, &c, sizeof(c));
         }
         printf("sent DGRAM!\n");
         sendto(fd, buff, sizeof(buff), 0, (struct sockaddr*)&to, tolen);
     }
+    fclose(file);
     printf("all DGRAMS sent\n");
 
-    // SHA512_T senden (SHA512_T, SHA-512-Hashwert(64Bytes))
+    /* send SHA512 (SHA512_T, SHA-512-Hashwert(64Bytes)) */
+    typID = SHA512_T;
     printf("Sending SHA512...\n");
     strcat(shabuff, (unsigned char*) &SHA512_T);
     strcat(shabuff, &mySha512);
@@ -136,14 +164,25 @@ int main(int argc, char** argv)
     if (err == -1)
     {
         printf("ERROR: couldnt send SHA!\n");
+        exit(-1);
     }
     else
     {
-        printf("Send SHA512 size: %d Bytes", err);
+        printf("Send SHA512 size: %d Bytes\n", err);
     }
-    // SHA512_CMP_T empfangen (SHA512_CMP_T, Vergleichsergebniss(1Bytes))
-    //recvfrom(fd, recvSha512, sizeof(recvSha512), 0, (struct sockaddr*) &to, &tolen);
-
-    //close socket
+    /* receive SHA512 compare result */
+    err = recvfrom(fd, &cmpResult, sizeof(cmpResult), 0, (struct sockaddr*) &to, &tolen);
+    if (err = -1)
+    {
+        printf("ERROR: No SHA_CMP_T received\n");
+        exit(-1);
+    }
+    else
+    {
+        printf("received SHA_CMP_T\n");
+    }
+    if (cmpResult == SHA512_CMP_OK) printf("SHA_CMP is correct!");
+    else printf("SHA_CMP does not match!");
+    /* close socket */
     close(fd);
 }

@@ -20,8 +20,8 @@ int main(int argc, char** argv)
     FILE* file = fopen("dir.zip", "a");
     unsigned char buff[1024];
     unsigned char shabuff[64];
-    unsigned char request = 5;
     int tolen;
+    unsigned char typID;
     struct timeval tv;
     int i = 0;
 
@@ -52,8 +52,9 @@ int main(int argc, char** argv)
     bind(fd, (struct sockaddr*) &from, sizeof(from));
 
     /* Data exchange*/
-    /* sending REQUEST_T */
-    err = sendto(fd, &request, sizeof(request), 0, (struct sockaddr*) &to, tolen);
+    /* sending request */
+    typID = REQUEST_T;
+    err = sendto(fd, &typID, sizeof(typID), 0, (struct sockaddr*) &to, tolen);
     if(err == -1)
     {
         printf("ERROR: couldnt send\n");
@@ -63,7 +64,7 @@ int main(int argc, char** argv)
         printf("Data sent %d Bytes\n", err);
     }
 
-    /* receiving HEADER_T */
+    /* receiving header */
     printf("waiting for response...\n");
     err = recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
 
@@ -78,24 +79,34 @@ int main(int argc, char** argv)
 
     /* receiving data */
     printf("receiving Datagram...\n");
-    while(buff[0] != (unsigned char)SHA512_T)
+    while(1)
     {
-        recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
-        for (i = 0; i < 1024; i++) fputc(buff[i], file); 
+        err = recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen); 
+        if (*buff != DATA_T) 
+        {
+            printf("No more DATA_T packages!\n");
+            break;
+        }
+        if (err == -1) 
+        {
+            printf("ERROR: couldnt receive\n");
+            exit(-1);
+        }
+        printf("DATA_T: %d \n", *buff);
+        for (i = 5; i < 1019; i++) fputc(buff[i], file); 
     }
+    fclose(file);
 
     /* receiving SHA */
     printf("receifing SHA512...\n");
-    err = recvfrom(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, &tolen);
-    if (err == -1)
+    //err = recvfrom(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, &tolen);
+    if (*buff == SHA512_T)
     {
-        printf("ERROR: nothing received\n");
+        printf("received SHA512 typID\n");
     }
-    else
-    {
-        printf("received %d Bytes\n", err);
-    }
+
     /* sending SHA512_CMP_T */
+    typID = SHA512_CMP_T;
 
     /* close socket */
     close(fd);
