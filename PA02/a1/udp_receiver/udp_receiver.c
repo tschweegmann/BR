@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include "Aufgabe2.h"
+#include <string.h>
 
 int main(int argc, char** argv)
 {
@@ -24,7 +25,8 @@ int main(int argc, char** argv)
     unsigned char typID;
     struct timeval tv;
     int i = 0;
-
+    unsigned int seqNr = 0;
+    unsigned int nextseqNr = 1;
     tolen = sizeof(to);
 
     /* Input */
@@ -96,7 +98,16 @@ int main(int argc, char** argv)
             exit(-1);
         }
         printf("DATA_T: %d \n", *buff);
-        for (i = 5; i < 1019; i++) fputc(buff[i], file); 
+        memcpy(&seqNr, (buff + 1), sizeof(unsigned int));
+        printf("buffer seqNr: %d \n", (unsigned int)*(buff+1));
+        //if (seqNr != nextseqNr - 1)
+        //{
+        //    printf("%s", order_error);
+        //    exit(-1);
+        //}
+        for (i = 5; i < 1019; i++) fputc(buff[i], file);
+        nextseqNr++;
+        memset(buff, 0, 1024);
     }
     fclose(file);
 

@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 
     /* Zip creation stuff */
     char* zipstring = "zip -r dir.zip ";
-    char* command[sizeof(zipstring) + sizeof(path)];
+    char command[sizeof(zipstring) + sizeof(path)];
     /* Header stuff*/
     char* filename;
     unsigned short namelength;
@@ -41,8 +41,8 @@ int main(int argc, char** argv)
     unsigned int* filesizeptr = 0;
 
     /* SHA512 stuff*/
-    unsigned char* shabuff[65];
-    unsigned char* mySha512[64];
+    unsigned char shabuff[65];
+    unsigned char mySha512[64];
     unsigned char cmpResult;
 
     int c;
@@ -54,9 +54,19 @@ int main(int argc, char** argv)
     unsigned int* seqNrptr = 0;
     unsigned char* data = 0;
 
-    /* Input (still needs to check if input is correct)*/
-    path = argv[2];
+    /* checking input */
     port = atoi(argv[1]);
+    if (port > 65535 || port < 0)
+    {
+        printf("only Ports 0 - 65535 exist\n");
+        exit(-1);
+    }
+    path = argv[2];
+    if (access(path, F_OK) == -1)
+    {
+        printf("ERROR: File does not exist!\n");
+        exit(-1);
+    }
 
     /* set local address values */
     from.sin_family = AF_INET;
@@ -89,17 +99,16 @@ int main(int argc, char** argv)
     typID = HEADER_T;
     memcpy(header, &typID, sizeof(typID));
     /* namelength */
-    namelengthptr = header + sizeof(typID);
+    namelengthptr = (unsigned short*)(header + sizeof(typID));
     memcpy(namelengthptr, &namelength, sizeof(namelength));
     /* filename */
-    filenameptr = header + sizeof(typID) + sizeof(unsigned short);
+    filenameptr = (char*)(header + sizeof(typID) + sizeof(unsigned short));
     memcpy(filenameptr, &filename, sizeof(filename));
     /* filesize */
-    filesizeptr = header + sizeof(typID) + sizeof(namelength) + sizeof(filename);
+    filesizeptr = (unsigned int*)(header + sizeof(typID) + sizeof(namelength) + sizeof(filename));
     memcpy(filesizeptr, &filesize, sizeof(filesize));
 
     /* (DEBUG) print actual header data */
-    printf("HEADER_T in header: %d \n", *header);
     printf("namelength in header: %d \n", *namelengthptr);
     memcpy(&filename, filenameptr, sizeof(filename));
     printf("filenameptr in header : %s\n", filename);
@@ -114,11 +123,6 @@ int main(int argc, char** argv)
 
     /* Socket */
     fd = socket(AF_INET, SOCK_DGRAM, 0);
-    /* set socket timeout (10 sec) */
-    tv.tv_sec = 10;
-    tv.tv_usec = 0;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
     tolen = sizeof(struct sockaddr_in);
     bind(fd, (struct sockaddr*) &from, sizeof(from));
 
@@ -141,6 +145,11 @@ int main(int argc, char** argv)
         exit(-1);
     }
 
+    /* set socket timeout (10 sec) */
+    tv.tv_sec = 10;
+    tv.tv_usec = 0;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     /* send header */
     printf("sending header...\n");
     sendto(fd, header, sizeof(header), 0, (struct sockaddr*)&to, tolen);
@@ -148,12 +157,12 @@ int main(int argc, char** argv)
     /* send data */
     typID = DATA_T;
     seqNr = 0;
-    data = buff + sizeof(typID) + sizeof(seqNr); /* Pointer to real data */ 
+    data = (unsigned char*)(buff + sizeof(typID) + sizeof(seqNr)); /* Pointer to real data */ 
     while(eof == 0)
     {
-        memset(buff, 0, sizeof(buff));
+        memset(buff, 0, sizeof(buff)); /* clear buffer */
         memcpy(buff, &typID, sizeof(typID));
-        memcpy(buff + sizeof(typID), &seqNr, sizeof(seqNr)); 
+        memcpy(buff + sizeof(typID), &seqNr, sizeof(seqNr));
         for (i = 0; i < 1019; i++)
         {
             c = fgetc(file);
@@ -164,8 +173,10 @@ int main(int argc, char** argv)
             }
             memcpy(data + i, &c, sizeof(c));
         }
+        printf("buff SeqNr: %d\n", *(buff+1));
         sendto(fd, buff, sizeof(buff), 0, (struct sockaddr*)&to, tolen);
         printf("sent DGRAM!\n");
+        seqNr++;
     }
     fclose(file);
     printf("all DGRAMS sent\n");
@@ -174,7 +185,7 @@ int main(int argc, char** argv)
     typID = SHA512_T;
     printf("Sending SHA512...\n");
     strcat(shabuff, (unsigned char*) &SHA512_T);
-    strcat(shabuff, &mySha512);
+    strcat(shabuff, mySha512);
     err = sendto(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, tolen);
     if (err == -1)
     {
@@ -209,6 +220,7 @@ int main(int argc, char** argv)
         exit(-1);
     }
     printf("transmission completed\n");
+
     /* close socket */
     close(fd);
 }
