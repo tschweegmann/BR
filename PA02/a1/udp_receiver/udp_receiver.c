@@ -131,7 +131,7 @@ int main(int argc, char** argv)
         {
             fputc(buff[i], file);
             receivedBytes++;
-            //if (receivedBytes == filesize) i = 9999;
+            if (receivedBytes == filesize) i = 9999;
         }
         nextseqNr++;
         memset(buff, 0, BUFFERSIZE);
