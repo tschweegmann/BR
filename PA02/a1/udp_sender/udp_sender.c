@@ -10,6 +10,8 @@
 #include <libgen.h>
 #include <stdlib.h>
 
+#define BUFFERSIZE 1024
+
 int main(int argc, char** argv)
 {
     /* Input */
@@ -24,7 +26,7 @@ int main(int argc, char** argv)
     int tolen;
     struct timeval tv; /* to make recvfrom() wait */
     FILE* file;
-    unsigned char* buff[1024];
+    unsigned char* buff[BUFFERSIZE];
 
     /* Zip creation stuff */
     char* zipstring = "zip -r dir.zip ";
@@ -34,7 +36,7 @@ int main(int argc, char** argv)
     unsigned short namelength;
     unsigned int filesize;
     /* Header still takes to much mem: 120Bytes instead of 15 :/*/
-    unsigned char* header[sizeof(typID) + sizeof(namelength) + sizeof(filename) + sizeof(filesize)];
+    unsigned char header[sizeof(typID) + sizeof(namelength) + sizeof(filename) + sizeof(filesize)];
     /* ptr to things in header*/
     char* filenameptr = 0;
     unsigned short* namelengthptr = 0;
@@ -103,14 +105,14 @@ int main(int argc, char** argv)
     memcpy(namelengthptr, &namelength, sizeof(namelength));
     /* filename */
     filenameptr = (char*)(header + sizeof(typID) + sizeof(unsigned short));
-    memcpy(filenameptr, &filename, sizeof(filename));
+    memcpy(filenameptr, &filename, strlen(filename));
     /* filesize */
-    filesizeptr = (unsigned int*)(header + sizeof(typID) + sizeof(namelength) + sizeof(filename));
+    filesizeptr = (unsigned int*)(header + sizeof(typID) + sizeof(namelength) + strlen(filename));
     memcpy(filesizeptr, &filesize, sizeof(filesize));
 
     /* (DEBUG) print actual header data */
     printf("namelength in header: %d \n", *namelengthptr);
-    memcpy(&filename, filenameptr, sizeof(filename));
+    memcpy(&filename, filenameptr, strlen(filename));
     printf("filenameptr in header : %s\n", filename);
     printf("filesize in header: %d \n", *filesizeptr);
 
@@ -160,7 +162,7 @@ int main(int argc, char** argv)
     data = (unsigned char*)(buff + sizeof(typID) + sizeof(seqNr)); /* Pointer to real data */ 
     while(eof == 0)
     {
-        memset(buff, 0, sizeof(buff)); /* clear buffer */
+        memset(buff, 0, BUFFERSIZE); /* clear buffer */
         memcpy(buff, &typID, sizeof(typID));
         memcpy(buff + sizeof(typID), &seqNr, sizeof(seqNr));
         for (i = 0; i < 1019; i++)
@@ -174,7 +176,7 @@ int main(int argc, char** argv)
             memcpy(data + i, &c, sizeof(c));
         }
         printf("buff SeqNr: %d\n", *(buff+1));
-        sendto(fd, buff, sizeof(buff), 0, (struct sockaddr*)&to, tolen);
+        sendto(fd, buff, BUFFERSIZE, 0, (struct sockaddr*)&to, tolen);
         printf("sent DGRAM!\n");
         seqNr++;
     }

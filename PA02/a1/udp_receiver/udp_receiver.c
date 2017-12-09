@@ -8,6 +8,8 @@
 #include "Aufgabe2.h"
 #include <string.h>
 
+#define BUFFERSIZE 1024
+
 int main(int argc, char** argv)
 {
     /* Input */
@@ -19,7 +21,7 @@ int main(int argc, char** argv)
     struct sockaddr_in from;
     struct sockaddr_in to;
     FILE* file = fopen("dir.zip", "a");
-    unsigned char buff[1024];
+    unsigned char buff[BUFFERSIZE];
     unsigned char shabuff[64];
     int tolen;
     unsigned char typID;
@@ -27,6 +29,9 @@ int main(int argc, char** argv)
     int i = 0;
     unsigned int seqNr = 0;
     unsigned int nextseqNr = 1;
+    char* filename;
+    unsigned short namelength = 0;
+    unsigned int filesize = 0;
     tolen = sizeof(to);
 
     /* Input */
@@ -78,7 +83,7 @@ int main(int argc, char** argv)
 
     /* receiving header */
     printf("waiting for response...\n");
-    err = recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen);
+    err = recvfrom(fd, buff, BUFFERSIZE, 0, (struct sockaddr*) &to, &tolen);
     if (err == -1)
     {
         printf("Nothing received :(\n");
@@ -90,12 +95,18 @@ int main(int argc, char** argv)
         printf("Received %d Bytes\n", err);
     }
     if (*buff != HEADER_T) printf("%s", packet_error);
+    memcpy(&namelength, buff + 1, 2);
+    //filename = malloc(namelength);
+    //memcpy(filename, buff + 3, namelength);
+    memcpy(&filesize, buff + 3 + namelength, 4);
+    printf("Filesize: %d namelength: %d filename: \n", filesize, namelength);
+    for (i = 0; i < err; i++) printf("%d\n", buff[i]);
 
     /* receiving data */
     printf("receiving Datagram...\n");
     while(1)
     {
-        err = recvfrom(fd, buff, sizeof(buff), 0, (struct sockaddr*) &to, &tolen); 
+        err = recvfrom(fd, buff, BUFFERSIZE, 0, (struct sockaddr*) &to, &tolen); 
         if (*buff != DATA_T) 
         {
             printf("No more DATA_T packages!\n");
@@ -117,7 +128,7 @@ int main(int argc, char** argv)
         //}
         for (i = 5; i < 1019; i++) fputc(buff[i], file);
         nextseqNr++;
-        memset(buff, 0, 1024);
+        memset(buff, 0, BUFFERSIZE);
     }
     fclose(file);
 
