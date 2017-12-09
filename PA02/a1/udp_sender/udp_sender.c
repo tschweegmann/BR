@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     int tolen;
     struct timeval tv; /* to make recvfrom() wait */
     FILE* file;
-    unsigned char* buff[BUFFERSIZE];
+    unsigned char* buff = malloc(BUFFERSIZE);
 
     /* Zip creation stuff */
     char* zipstring = "zip -r dir.zip ";
@@ -35,8 +35,9 @@ int main(int argc, char** argv)
     char* filename;
     unsigned short namelength;
     unsigned int filesize;
-    /* Header still takes to much mem: 120Bytes instead of 15 :/*/
-    unsigned char header[sizeof(typID) + sizeof(namelength) + sizeof(filename) + sizeof(filesize)];
+    /* Header */
+    int headersize = sizeof(typID) + sizeof(namelength) + sizeof(filename) + sizeof(filesize);
+    unsigned char header[headersize];
     /* ptr to things in header*/
     char* filenameptr = 0;
     unsigned short* namelengthptr = 0;
@@ -154,7 +155,7 @@ int main(int argc, char** argv)
 
     /* send header */
     printf("sending header...\n");
-    sendto(fd, header, sizeof(header), 0, (struct sockaddr*)&to, tolen);
+    sendto(fd, header, headersize, 0, (struct sockaddr*)&to, tolen);
 
     /* send data */
     typID = DATA_T;

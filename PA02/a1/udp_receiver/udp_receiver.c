@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     int err;
     struct sockaddr_in from;
     struct sockaddr_in to;
-    FILE* file = fopen("dir.zip", "a");
+    FILE* file = fopen("dir.zip", "w");
     unsigned char buff[BUFFERSIZE];
     unsigned char shabuff[64];
     int tolen;
@@ -32,6 +32,7 @@ int main(int argc, char** argv)
     char* filename;
     unsigned short namelength = 0;
     unsigned int filesize = 0;
+    int receivedBytes = 0;
     tolen = sizeof(to);
 
     /* Input */
@@ -107,12 +108,12 @@ int main(int argc, char** argv)
     while(1)
     {
         err = recvfrom(fd, buff, BUFFERSIZE, 0, (struct sockaddr*) &to, &tolen); 
-        if (*buff != DATA_T) 
+        if (*buff != DATA_T)
         {
             printf("No more DATA_T packages!\n");
             break;
         }
-        if (err == -1) 
+        if (err == -1)
         {
             printf("ERROR: couldnt receive\n");
             printf("%s", timeout_error);
@@ -126,7 +127,12 @@ int main(int argc, char** argv)
         //    printf("%s", order_error);
         //    exit(-1);
         //}
-        for (i = 5; i < 1019; i++) fputc(buff[i], file);
+        for (i = 5; i < 1024; i++) 
+        {
+            fputc(buff[i], file);
+            receivedBytes++;
+            //if (receivedBytes == filesize) i = 9999;
+        }
         nextseqNr++;
         memset(buff, 0, BUFFERSIZE);
     }
