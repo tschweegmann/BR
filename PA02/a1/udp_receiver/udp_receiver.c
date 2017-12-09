@@ -31,7 +31,17 @@ int main(int argc, char** argv)
 
     /* Input */
     port = atoi(argv[1]);
+    if (port > 65535 || port < 0)
+    {
+        printf("only ports 0 - 65535 exist\n");
+        exit(-1);
+    }
     addr = argv[2];
+    if (inet_pton(AF_INET, addr, &(to.sin_addr)) == 0)
+    {
+        printf("Invalid IP address\n");
+        exit(-1);
+    }
 
 
     printf("Connecting to %s\n", addr);
