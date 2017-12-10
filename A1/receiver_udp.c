@@ -110,7 +110,7 @@ int main(int argc, char** argv)
     printf(filesize_str, filesize);
 
     /* receiving data */
-    file = fopen("dir.zip", "w");
+    file = fopen("./received/dir.zip", "w");
     if (file == NULL)
     {
        perror("couldnt open file: ");
