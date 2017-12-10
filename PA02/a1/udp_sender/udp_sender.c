@@ -61,7 +61,7 @@ int main(int argc, char** argv)
     port = atoi(argv[1]);
     if (port > 65535 || port < 0)
     {
-        printf("only Ports 0 - 65535 exist\n");
+        printf(port_error, argv[1]);
         exit(-1);
     }
     path = argv[2];

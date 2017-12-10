@@ -39,13 +39,13 @@ int main(int argc, char** argv)
     port = atoi(argv[1]);
     if (port > 65535 || port < 0)
     {
-        printf("only ports 0 - 65535 exist\n");
+        printf(port_error, argv[1]);
         exit(-1);
     }
     addr = argv[2];
     if (inet_pton(AF_INET, addr, &(to.sin_addr)) == 0)
     {
-        printf("Invalid IP address\n");
+        printf(address_error, addr, argv[1]);
         exit(-1);
     }
 
