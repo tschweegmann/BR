@@ -113,7 +113,7 @@ int main(int argc, char** argv)
     file = fopen("./received/dir.zip", "w");
     if (file == NULL)
     {
-       perror("couldnt open file: ");
+       perror("There is no directory called 'received'! ");
     }
     printf("receiving Datagram...\n");
 

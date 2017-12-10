@@ -3,6 +3,7 @@ all:
 	gcc receiver_udp.c -lssl -lcrypto -o receiver
 	mkdir received
 clean:
-	rm receiver sender
-	rm -r received
-	rm dir.zip
+	if [ -f sender ]; then rm sender; fi
+	if [ -f receiver ]; then rm receiver; fi
+	if [ -d received ]; then rm -rf received; fi
+	if [ -f dir.zip ]; then rm -f dir.zip; fi 
