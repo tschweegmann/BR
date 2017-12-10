@@ -1,4 +1,4 @@
-all: 
+default: sender_udp.c receiver_udp.c 
 	gcc sender_udp.c -lssl -lcrypto -o sender
 	gcc receiver_udp.c -lssl -lcrypto -o receiver
 	mkdir received
