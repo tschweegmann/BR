@@ -23,6 +23,8 @@ int main(int argc, char** argv)
     FILE* file;
     unsigned char buff[BUFFERSIZE];
     unsigned char shabuff[64];
+    unsigned char recvsha[64];
+    unsigned char* filebuff;
     int tolen;
     unsigned char typID;
     struct timeval tv;
@@ -149,21 +151,41 @@ int main(int argc, char** argv)
     }
     fclose(file);
 
-
     /* under construction xD*/
     /* receiving SHA */
     printf("receifing SHA512...\n");
-    //err = recvfrom(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, &tolen);
     if (*buff == SHA512_T)
     {
         printf("received SHA512 typID\n");
     }
     else printf(packet_error);
+    memcpy(recvsha, buff + 1, 64);
+    //for(i = 0; i < 64; i++) printf("%d\n", recvsha[i]); 
+
+
+    file = fopen("dir.zip", "r");
+    filebuff = malloc(filesize);
+    for (i = 0; i < filesize; i++) filebuff[i] = fgetc(file);
+    SHA512(filebuff, filesize, shabuff);
+    //for(i = 0; i < 64; i++) printf("%d\n", shabuff[i]);
+    //printf("strlen() = %d\n", strlen(shabuff));
+
 
     /* sending SHA512_CMP_T */
-    typID = SHA512_CMP_T;
+    if(strcmp(shabuff, recvsha))
+    {
+        typID = SHA512_CMP_OK;
+        printf("sha512_ok\n");
+    }
+    else
+    {
+        typID = SHA512_CMP_ERROR;
+        printf("sha512_error\n");
+    }
+    sendto(fd, &typID, sizeof(typID), 0, (struct sockaddr*) &to, tolen);
 
     /* close socket */
+    fclose(file);
     close(fd);
     free(filename);
     return 0;

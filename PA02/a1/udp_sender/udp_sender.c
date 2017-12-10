@@ -27,6 +27,7 @@ int main(int argc, char** argv)
     struct timeval tv;
     FILE* file;
     unsigned char* buff = malloc(BUFFERSIZE);
+    unsigned char* filebuff;
 
     /* Zip creation */
     char* zipstring = "zip -r dir.zip ";
@@ -119,6 +120,16 @@ int main(int argc, char** argv)
     tolen = sizeof(struct sockaddr_in);
     bind(fd, (struct sockaddr*) &from, sizeof(from));
 
+    filebuff = malloc(filesize);
+    for (i = 0; i < filesize; i++) 
+    {
+        filebuff[i] = fgetc(file);
+    }
+    SHA512(filebuff, filesize, mySha512);
+    //for(i = 0; i < 64; i++) printf("%d\n", mySha512[i]);
+    //printf("strlen() = %d\n", strlen(mySha512));
+    rewind(file);
+
     /* Data exchange */
     /* recv initial request */
     printf("waiting for request...\n");
@@ -195,8 +206,8 @@ int main(int argc, char** argv)
     /* send SHA512 (SHA512_T, SHA-512-Hashwert(64Bytes)) */
     typID = SHA512_T;
     printf("Sending SHA512...\n");
-    strcat(shabuff, (unsigned char*) &SHA512_T);
-    strcat(shabuff, mySha512);
+    memcpy(shabuff, (unsigned char*) &SHA512_T, 1);
+    memcpy(shabuff + 1, &mySha512, 64);
     err = sendto(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, tolen);
     if (err == -1)
     {
@@ -207,9 +218,11 @@ int main(int argc, char** argv)
     {
         printf("Send SHA512 size: %d Bytes\n", err);
     }
+
     /* receive SHA512 compare result */
-    err = recvfrom(fd, &cmpResult, sizeof(cmpResult), 0, (struct sockaddr*) &to, &tolen);
-    if (err = -1)
+    printf("receiving compare result...\n");
+    err = recvfrom(fd, &cmpResult, 1, 0, (struct sockaddr*) &to, &tolen);
+    if (err == -1)
     {
         printf("%s", timeout_error);
         exit(-1);
@@ -219,10 +232,10 @@ int main(int argc, char** argv)
         printf("received SHA_CMP_T\n");
     }
 
-    if (cmpResult == SHA512_CMP_OK) printf("SHA_CMP is correct!");
+    if (cmpResult == SHA512_CMP_OK) printf("sha512_ok\n");
     else if (cmpResult == SHA512_CMP_ERROR) 
     {
-        printf("SHA_CMP does not match!");
+        printf("sha512_error");
         exit(-1);
     }
     else
@@ -235,5 +248,4 @@ int main(int argc, char** argv)
     /* close socket */
     close(fd);
     free(buff);
-    free(filename);
 }
