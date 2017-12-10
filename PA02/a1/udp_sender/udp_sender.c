@@ -77,25 +77,26 @@ int main(int argc, char** argv)
     from.sin_addr.s_addr = htonl(INADDR_ANY);
 
     /* Zip file */
-    printf("File path: %s\n", path);
+    //printf("File path: %s\n", path);
     strcat(command, zipstring);
     strcat(command, path);
-    printf("zip command: %s\n", command);
+    //printf("zip command: %s\n", command);
     system(command);
     file = fopen("dir.zip", "rw");
 
     /* Header */
     /* get data needed for header */
+    namelength = strlen(basename(path));
+    filename = malloc(namelength);
     filename = basename(path);
-    namelength = strlen(filename);
     fseek(file, 0L, SEEK_END);
     filesize = ftell(file);
     rewind(file);
     /* (DEBUG) prints data to be included in header*/
-    printf("Header:\n");
-    printf("filename: %s\n", filename);
-    printf("namelength %d\n", namelength);
-    printf("Filesize: %d\n", filesize);
+    //printf("Header:\n");
+    printf(filename_str, filename);
+    //printf("namelength %d\n", namelength);
+    printf(filesize_str, filesize);
 
     /* add to header */
     /* Typ-id */
@@ -106,16 +107,15 @@ int main(int argc, char** argv)
     memcpy(namelengthptr, &namelength, sizeof(namelength));
     /* filename */
     filenameptr = (char*)(header + sizeof(typID) + sizeof(unsigned short));
-    memcpy(filenameptr, &filename, strlen(filename));
+    memcpy(filenameptr, filename, strlen(filename));
     /* filesize */
     filesizeptr = (unsigned int*)(header + sizeof(typID) + sizeof(namelength) + strlen(filename));
     memcpy(filesizeptr, &filesize, sizeof(filesize));
-
     /* (DEBUG) print actual header data */
-    printf("namelength in header: %d \n", *namelengthptr);
-    memcpy(&filename, filenameptr, strlen(filename));
-    printf("filenameptr in header : %s\n", filename);
-    printf("filesize in header: %d \n", *filesizeptr);
+    //printf("namelength in header: %d \n", *namelengthptr);
+    //memcpy(filename, filenameptr, strlen(filename));
+    //printf("filenameptr in header : %s\n", filename);
+    //printf("filesize in header: %d \n", *filesizeptr);
 
     //calc SHA-512
     SHA512_CTX ctx;
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
     }
     else
     {
-        printf("Received %d Bytes\n", err);
+        printf("Received request (%d Bytes)\n", err);
     }
     if (*buff != REQUEST_T)
     {
@@ -155,9 +155,16 @@ int main(int argc, char** argv)
 
     /* send header */
     printf("sending header...\n");
-    sendto(fd, header, headersize, 0, (struct sockaddr*)&to, tolen);
+    err = sendto(fd, header, headersize, 0, (struct sockaddr*)&to, tolen);
+    if (err == -1)
+    {
+         printf("ERROR: couldnt send Header!\n");
+         exit(-1);
+    }
+    else printf("finished sending header!\n");
 
     /* send data */
+    printf("sending data...\n");
     typID = DATA_T;
     seqNr = 0;
     data = (unsigned char*)(buff + sizeof(typID) + sizeof(seqNr)); /* Pointer to real data */ 
@@ -176,13 +183,21 @@ int main(int argc, char** argv)
             }
             memcpy(data + i, &c, sizeof(c));
         }
-        printf("buff SeqNr: %d\n", *(buff+1));
-        sendto(fd, buff, BUFFERSIZE, 0, (struct sockaddr*)&to, tolen);
-        printf("sent DGRAM!\n");
+        err =sendto(fd, buff, BUFFERSIZE, 0, (struct sockaddr*)&to, tolen);
+        if (err == -1)
+        {
+            printf("couldnt send data\n");
+            exit(-1);
+        }
         seqNr++;
     }
-    fclose(file);
-    printf("all DGRAMS sent\n");
+    printf("all data sent!\n");
+    if (fclose(file) == EOF) 
+    {
+        printf("closing file error");
+        exit(-1);
+    }
+    //printf("all DGRAMS sent\n");
 
     /* send SHA512 (SHA512_T, SHA-512-Hashwert(64Bytes)) */
     typID = SHA512_T;
@@ -226,4 +241,6 @@ int main(int argc, char** argv)
 
     /* close socket */
     close(fd);
+    free(buff);
+    free(filename);
 }

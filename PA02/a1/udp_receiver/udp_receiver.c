@@ -97,11 +97,13 @@ int main(int argc, char** argv)
     }
     if (*buff != HEADER_T) printf("%s", packet_error);
     memcpy(&namelength, buff + 1, 2);
-    //filename = malloc(namelength);
-    //memcpy(filename, buff + 3, namelength);
+    filename = malloc(namelength);
+    memcpy(filename, buff + 3, namelength);
     memcpy(&filesize, buff + 3 + namelength, 4);
-    printf("Filesize: %d namelength: %d filename: \n", filesize, namelength);
-    for (i = 0; i < err; i++) printf("%d\n", buff[i]);
+
+    /* Print information */
+    printf(filename_str, filename);
+    printf(filesize_str, filesize);
 
     /* receiving data */
     printf("receiving Datagram...\n");
@@ -119,14 +121,14 @@ int main(int argc, char** argv)
             printf("%s", timeout_error);
             exit(-1);
         }
-        printf("DATA_T: %d \n", *buff);
+        //printf("DATA_T: %d \n", *buff);
         memcpy(&seqNr, (buff + 1), sizeof(unsigned int));
-        printf("buffer seqNr: %d \n", (unsigned int)*(buff+1));
-        //if (seqNr != nextseqNr - 1)
-        //{
-        //    printf("%s", order_error);
-        //    exit(-1);
-        //}
+        //printf("buffer seqNr: %d \n", (unsigned int)*(buff+1));
+        if (seqNr != nextseqNr - 1)
+        {
+            printf("%s", order_error);
+            exit(-1);
+        }
         for (i = 5; i < 1024; i++) 
         {
             fputc(buff[i], file);
@@ -151,5 +153,6 @@ int main(int argc, char** argv)
 
     /* close socket */
     close(fd);
+    free(filename);
     return 0;
 }
