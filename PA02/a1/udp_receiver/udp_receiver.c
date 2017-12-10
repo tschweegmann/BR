@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     int err;
     struct sockaddr_in from;
     struct sockaddr_in to;
-    FILE* file = fopen("dir.zip", "w");
+    FILE* file;
     unsigned char buff[BUFFERSIZE];
     unsigned char shabuff[64];
     int tolen;
@@ -48,8 +48,6 @@ int main(int argc, char** argv)
         printf(address_error, addr, argv[1]);
         exit(-1);
     }
-
-
     printf("Connecting to %s\n", addr);
 
     /* socket() */
@@ -66,10 +64,9 @@ int main(int argc, char** argv)
     to.sin_family = AF_INET;
     to.sin_port = htons(port);
     to.sin_addr.s_addr = inet_addr(addr); 
-
     bind(fd, (struct sockaddr*) &from, sizeof(from));
 
-    /* Data exchange*/
+    /* data exchange*/
     /* sending request */
     typID = REQUEST_T;
     err = sendto(fd, &typID, sizeof(typID), 0, (struct sockaddr*) &to, tolen);
@@ -79,7 +76,7 @@ int main(int argc, char** argv)
     }
     else
     {
-        printf("Data sent %d Bytes\n", err);
+        printf("Request sent (%d Bytes)\n", err);
     }
 
     /* receiving header */
@@ -87,29 +84,41 @@ int main(int argc, char** argv)
     err = recvfrom(fd, buff, BUFFERSIZE, 0, (struct sockaddr*) &to, &tolen);
     if (err == -1)
     {
-        printf("Nothing received :(\n");
-        printf("%s", timeout_error);
+        printf(timeout_error);
         exit(-1);
     }
     else
     {
-        printf("Received %d Bytes\n", err);
+        printf("Received header (%d Bytes)\n", err);
     }
-    if (*buff != HEADER_T) printf("%s", packet_error);
+    if (*buff != HEADER_T)
+    {
+        printf(packet_error);
+        exit(-1);
+    }
+
+    /* get header information*/
     memcpy(&namelength, buff + 1, 2);
     filename = malloc(namelength);
     memcpy(filename, buff + 3, namelength);
     memcpy(&filesize, buff + 3 + namelength, 4);
 
-    /* Print information */
+    /* print information */
     printf(filename_str, filename);
     printf(filesize_str, filesize);
 
     /* receiving data */
+    file = fopen("dir.zip", "w");
+    if (file == NULL)
+    {
+       perror("couldnt open file: ");
+    }
     printf("receiving Datagram...\n");
+
     while(1)
     {
         err = recvfrom(fd, buff, BUFFERSIZE, 0, (struct sockaddr*) &to, &tolen); 
+        /* check correct typ-ID*/
         if (*buff != DATA_T)
         {
             printf("No more DATA_T packages!\n");
@@ -118,17 +127,17 @@ int main(int argc, char** argv)
         if (err == -1)
         {
             printf("ERROR: couldnt receive\n");
-            printf("%s", timeout_error);
+            printf(timeout_error);
             exit(-1);
         }
-        //printf("DATA_T: %d \n", *buff);
         memcpy(&seqNr, (buff + 1), sizeof(unsigned int));
-        //printf("buffer seqNr: %d \n", (unsigned int)*(buff+1));
+        /*check sequence number*/
         if (seqNr != nextseqNr - 1)
         {
-            printf("%s", order_error);
+            printf(order_error, seqNr, nextseqNr - 1);
             exit(-1);
         }
+        /* write data to file */
         for (i = 5; i < 1024; i++) 
         {
             fputc(buff[i], file);
@@ -140,6 +149,8 @@ int main(int argc, char** argv)
     }
     fclose(file);
 
+
+    /* under construction xD*/
     /* receiving SHA */
     printf("receifing SHA512...\n");
     //err = recvfrom(fd, shabuff, sizeof(shabuff), 0, (struct sockaddr*) &to, &tolen);
@@ -147,7 +158,8 @@ int main(int argc, char** argv)
     {
         printf("received SHA512 typID\n");
     }
-    else printf("%s", packet_error);
+    else printf(packet_error);
+
     /* sending SHA512_CMP_T */
     typID = SHA512_CMP_T;
 

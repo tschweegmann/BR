@@ -24,29 +24,23 @@ int main(int argc, char** argv)
     struct sockaddr_in to;
     unsigned char typID;
     int tolen;
-    struct timeval tv; /* to make recvfrom() wait */
+    struct timeval tv;
     FILE* file;
     unsigned char* buff = malloc(BUFFERSIZE);
 
-    /* Zip creation stuff */
+    /* Zip creation */
     char* zipstring = "zip -r dir.zip ";
     char command[sizeof(zipstring) + sizeof(path)];
-    /* Header stuff*/
+
+    /* Header */
     char* filename;
     unsigned short namelength;
     unsigned int filesize;
-    /* Header */
     int headersize = sizeof(typID) + sizeof(namelength) + sizeof(filename) + sizeof(filesize);
     unsigned char header[headersize];
-    /* ptr to things in header*/
     char* filenameptr = 0;
     unsigned short* namelengthptr = 0;
     unsigned int* filesizeptr = 0;
-
-    /* SHA512 stuff*/
-    unsigned char shabuff[65];
-    unsigned char mySha512[64];
-    unsigned char cmpResult;
 
     int c;
     int i;
@@ -56,6 +50,11 @@ int main(int argc, char** argv)
     unsigned int seqNr;
     unsigned int* seqNrptr = 0;
     unsigned char* data = 0;
+
+    /* SHA512 stuff*/
+    unsigned char shabuff[65];
+    unsigned char mySha512[64];
+    unsigned char cmpResult;
 
     /* checking input */
     port = atoi(argv[1]);
@@ -77,10 +76,8 @@ int main(int argc, char** argv)
     from.sin_addr.s_addr = htonl(INADDR_ANY);
 
     /* Zip file */
-    //printf("File path: %s\n", path);
     strcat(command, zipstring);
     strcat(command, path);
-    //printf("zip command: %s\n", command);
     system(command);
     file = fopen("dir.zip", "rw");
 
@@ -92,10 +89,8 @@ int main(int argc, char** argv)
     fseek(file, 0L, SEEK_END);
     filesize = ftell(file);
     rewind(file);
-    /* (DEBUG) prints data to be included in header*/
-    //printf("Header:\n");
+    /* file information output */
     printf(filename_str, filename);
-    //printf("namelength %d\n", namelength);
     printf(filesize_str, filesize);
 
     /* add to header */
@@ -111,11 +106,6 @@ int main(int argc, char** argv)
     /* filesize */
     filesizeptr = (unsigned int*)(header + sizeof(typID) + sizeof(namelength) + strlen(filename));
     memcpy(filesizeptr, &filesize, sizeof(filesize));
-    /* (DEBUG) print actual header data */
-    //printf("namelength in header: %d \n", *namelengthptr);
-    //memcpy(filename, filenameptr, strlen(filename));
-    //printf("filenameptr in header : %s\n", filename);
-    //printf("filesize in header: %d \n", *filesizeptr);
 
     //calc SHA-512
     SHA512_CTX ctx;
@@ -138,15 +128,12 @@ int main(int argc, char** argv)
         printf("%s", timeout_error);
         exit(-1);
     }
-    else
-    {
-        printf("Received request (%d Bytes)\n", err);
-    }
     if (*buff != REQUEST_T)
     {
-        printf("%s", packet_error);
+        printf(packet_error);
         exit(-1);
     }
+    printf("received request!\n");
 
     /* set socket timeout (10 sec) */
     tv.tv_sec = 10;
@@ -170,9 +157,11 @@ int main(int argc, char** argv)
     data = (unsigned char*)(buff + sizeof(typID) + sizeof(seqNr)); /* Pointer to real data */ 
     while(eof == 0)
     {
+        /* prepare datagram*/
         memset(buff, 0, BUFFERSIZE); /* clear buffer */
         memcpy(buff, &typID, sizeof(typID));
         memcpy(buff + sizeof(typID), &seqNr, sizeof(seqNr));
+        /* read from file */
         for (i = 0; i < 1019; i++)
         {
             c = fgetc(file);
@@ -192,13 +181,17 @@ int main(int argc, char** argv)
         seqNr++;
     }
     printf("all data sent!\n");
+
+    /* closing file */
     if (fclose(file) == EOF) 
     {
         printf("closing file error");
         exit(-1);
     }
-    //printf("all DGRAMS sent\n");
 
+
+
+    /* under construction xD*/
     /* send SHA512 (SHA512_T, SHA-512-Hashwert(64Bytes)) */
     typID = SHA512_T;
     printf("Sending SHA512...\n");
@@ -232,9 +225,9 @@ int main(int argc, char** argv)
         printf("SHA_CMP does not match!");
         exit(-1);
     }
-    else 
+    else
     {
-        printf("%s", packet_error);
+        printf(packet_error);
         exit(-1);
     }
     printf("transmission completed\n");
