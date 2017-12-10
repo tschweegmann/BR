@@ -196,8 +196,7 @@ int main(int argc, char** argv)
     unsigned char* shaString; 
     shaString = create_sha512_string(mySha512);
     printf(sender_sha512, shaString);
-
-    /* under construction xD*/
+    
     /* send SHA512 (SHA512_T, SHA-512-Hashwert(64Bytes)) */
     typID = SHA512_T;
     printf("Sending SHA512...\n");
